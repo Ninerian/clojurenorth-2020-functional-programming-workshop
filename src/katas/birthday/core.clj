@@ -9,6 +9,8 @@
    (java.time.format DateTimeFormatter)
    (java.time.temporal ChronoUnit)))
 
+(def month-day (DateTimeFormatter/ofPattern "MM/dd"))
+(def year-month-day (DateTimeFormatter/ofPattern "yyyy/MM/dd"))
 
 (defn read-file
   [file]
@@ -24,16 +26,36 @@
   [[header & content]]
   (map (partial zipmap (map keyword header )) content))
 
+
+(defn get-today
+  ""
+  []
+  (LocalDate/now))
+
+(defn is-birthday
+  [today date]
+  (let [today' (.format today month-day)]
+    (string/ends-with? date today')))
+
+(defn get-year-diff
+  [to from]
+  (.between ChronoUnit/YEARS from to))
+
+
+
 (comment
  (file->csv  (read-file "birthday/employees.csv"))
+ (is-birthday "2020/06/25")
 
   (->>  "birthday/employees.csv"
         read-file
         file->csv
         parse-csv
+        (filter #(is-birthday (get-today) ( :date_of_birth %)))
        ;; rest
        )
 )
+
 
 (defn greet! []
   (->>  "birthday/employees.csv"
