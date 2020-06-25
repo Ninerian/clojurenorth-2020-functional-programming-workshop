@@ -9,10 +9,36 @@
    (java.time.format DateTimeFormatter)
    (java.time.temporal ChronoUnit)))
 
+
+(defn read-file
+  [file]
+  (io/reader (io/resource file)))
+
+(defn file->csv
+  ""
+  [reader]
+  (csv/read-csv reader))
+
+(defn parse-csv
+  ""
+  [[header & content]]
+  (map (partial zipmap (map keyword header )) content))
+
+(comment
+ (file->csv  (read-file "birthday/employees.csv"))
+
+  (->>  "birthday/employees.csv"
+        read-file
+        file->csv
+        parse-csv
+       ;; rest
+       )
+)
+
 (defn greet! []
-  (->> (io/resource "birthday/employees.csv")
-       (io/reader)
-       (csv/read-csv)
+  (->>  "birthday/employees.csv"
+        read-file
+        file->csv
        rest
        (filter (fn [row]
                  (string/ends-with?
