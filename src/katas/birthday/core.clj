@@ -11,25 +11,31 @@
 
 (def month-day (DateTimeFormatter/ofPattern "MM/dd"))
 (def year-month-day (DateTimeFormatter/ofPattern "yyyy/MM/dd"))
+(def connection {:host "localhost"
+                 :user "azurediamond"
+                 :pass "hunter2"
+                 :port 2525})
 
 (defn read-file
   [file]
   (io/reader (io/resource file)))
 
 (defn file->csv
-  ""
   [reader]
   (csv/read-csv reader))
 
 (defn parse-csv
-  ""
   [[header & content]]
-  (map (partial zipmap (map keyword header )) content))
+  (map (partial zipmap (map keyword header)) content))
 
+(def get-employees
+  (comp parse-csv file->csv read-file))
 
-(defn get-today
-  ""
-  []
+(defn parse-date
+  [date]
+  (LocalDate/parse date year-month-day))
+
+(defn get-today []
   (LocalDate/now))
 
 (defn is-birthday
@@ -41,45 +47,36 @@
   [to from]
   (.between ChronoUnit/YEARS from to))
 
+(defn get-age
+  [today {:keys [date_of_birth]}]
+  (get-year-diff today (parse-date date_of_birth)))
 
+(defn add-age
+  ""
+  [today employee]
+  (assoc employee :age (get-age today employee)))
 
-(comment
- (file->csv  (read-file "birthday/employees.csv"))
- (is-birthday "2020/06/25")
+(defn build-message
+  [name age]
+  (str "Happy Birthday " name "! " "Wow, you're " age " already!"))
 
-  (->>  "birthday/employees.csv"
-        read-file
-        file->csv
-        parse-csv
-        (filter #(is-birthday (get-today) ( :date_of_birth %)))
-       ;; rest
-       )
-)
+(defn build-mail
+  [{:keys [email name age]}]
+  {:from "me@example.com"
+   :to email
+   :subject "Happy Birthday!"
+   :body (build-message name age)})
 
+(defn send-mail!
+  [conn mail]
+  (postal/send-message conn mail))
 
-(defn greet! []
-  (->>  "birthday/employees.csv"
-        read-file
-        file->csv
-       rest
-       (filter (fn [row]
-                 (string/ends-with?
-                   (row 2)
-                   (.format (LocalDate/now) (DateTimeFormatter/ofPattern "MM/dd")))))
-       (map (fn [row]
-                 (postal/send-message
-                  {:host "localhost"
-                   :user "azurediamond"
-                   :pass "hunter2"
-                   :port 2525}
-                  {:from "me@example.com"
-                   :to (row 1)
-                   :subject "Happy Birthday!"
-                   :body (str "Happy Birthday " (row 0) "! "
-                              "Wow, you're "
-                              (.between ChronoUnit/YEARS
-                                        (LocalDate/parse (row 2)
-                                                         (DateTimeFormatter/ofPattern "yyyy/MM/dd"))
-                                        (LocalDate/now))
-                              " already!")})))
-       doall))
+(defn greet! [source today mail-fn]
+  (->>  source
+        get-employees
+        (filter #(is-birthday today (:date_of_birth %)))
+        (map (partial add-age today))
+        (map build-mail)
+        (map mail-fn)))
+
+(comment (greet! "birthday/employees.csv" (get-today) println))
